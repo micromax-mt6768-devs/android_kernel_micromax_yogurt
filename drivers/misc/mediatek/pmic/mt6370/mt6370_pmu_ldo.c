@@ -21,6 +21,8 @@
 #include <linux/of.h>
 #include "inc/mt6370_pmu.h"
 
+#define MT6370_PMU_LDO_DRV_VERSION	"1.0.1_MTK"
+
 struct mt6370_ldo_regulator_struct {
 	unsigned char vol_reg;
 	unsigned char vol_mask;
@@ -107,15 +109,26 @@ static int mt6370_ldo_set_voltage_sel(
 	const int count = rdev->desc->n_voltages;
 	u8 data;
 
+//prize modified by huarui, compatible more drv, 20190111-start
+	int ret = 0;
+//prize modified by huarui, compatible more drv, 20190111-end
+
 	if (selector > count)
 		return -EINVAL;
 
 	data = (u8)selector;
 	data <<= mt6370_ldo_regulators.vol_shift;
 
-	return mt6370_pmu_reg_update_bits(info->chip,
+//prize modified by huarui, compatible more drv, 20190111-start
+	//return mt6370_pmu_reg_update_bits(info->chip,
+	ret = mt6370_pmu_reg_update_bits(info->chip,
 		mt6370_ldo_regulators.vol_reg,
 		mt6370_ldo_regulators.vol_mask, data);
+	if (ret > 0){
+		return 0; //return 0 as No error.
+	}
+	return ret;
+//prize modified by huarui, compatible more drv, 20190111-end
 }
 
 static int mt6370_ldo_get_voltage_sel(struct regulator_dev *rdev)
@@ -260,6 +273,8 @@ static int mt6370_pmu_ldo_probe(struct platform_device *pdev)
 	struct mt6370_pmu_ldo_platform_data pdata, mask;
 	int ret;
 
+	pr_info("%s: (%s)\n", __func__, MT6370_PMU_LDO_DRV_VERSION);
+
 	ldo_data = devm_kzalloc(&pdev->dev, sizeof(*ldo_data), GFP_KERNEL);
 	if (!ldo_data)
 		return -ENOMEM;
@@ -335,13 +350,13 @@ module_platform_driver(mt6370_pmu_ldo);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MediaTek MT6370 PMU Vib LDO");
-MODULE_VERSION("1.0.1_G");
+MODULE_VERSION(MT6370_PMU_LDO_DRV_VERSION);
 
 /*
- * Revision Note
- * 1.0.1
+ * Release Note
+ * 1.0.1_MTK
  * (1) Remove force OSC on/off for enable/disable LDO
  *
- * 1.0.0
+ * 1.0.0_MTK
  * Initial release
  */

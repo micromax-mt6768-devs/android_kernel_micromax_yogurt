@@ -18,6 +18,12 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 
+//prize-add prize-wangyunqing-20181110-start
+#if defined(CONFIG_PRIZE_HARDWARE_INFO)
+#include "../../hardware_info/hardware_info.h"
+#endif
+//prize-add prize-wangyunqing-20181110-end
+
 #ifndef ARY_SIZE
 #define ARY_SIZE(x) (sizeof((x)) / sizeof((x[0])))
 #endif
@@ -525,6 +531,59 @@ struct dynamic_fps_info {
 	unsigned int vfp; /*lines*/
 	/*unsigned int idle_check_interval;*//*ms*/
 };
+/*DynFPS*/
+enum DynFPS_LEVEL {
+	DFPS_LEVEL0 = 0,
+	DFPS_LEVEL1,
+	DFPS_LEVELNUM,
+};
+
+#define DFPS_LEVELS 2
+enum FPS_CHANGE_INDEX {
+	DYNFPS_NOT_DEFINED = 0,
+	DYNFPS_DSI_VFP = 1,
+	DYNFPS_DSI_HFP = 2,
+	DYNFPS_DSI_MIPI_CLK = 4,
+};
+
+struct dfps_info {
+	enum DynFPS_LEVEL level;
+	unsigned int fps; /*real fps *100*/
+
+	unsigned int vertical_sync_active;
+	unsigned int vertical_backporch;
+	unsigned int vertical_frontporch;
+	unsigned int vertical_frontporch_for_low_power;
+
+	unsigned int horizontal_sync_active;
+	unsigned int horizontal_backporch;
+	unsigned int horizontal_frontporch;
+
+	unsigned int PLL_CLOCK;
+	/* data_rate = PLL_CLOCK x 2 */
+	unsigned int data_rate;
+	/*real fps during active*/
+	unsigned int vact_timing_fps; /*real vact timing fps * 100*/
+
+	/*mipi hopping*/
+	unsigned int dynamic_switch_mipi;
+	unsigned int vertical_sync_active_dyn;
+	unsigned int vertical_backporch_dyn;
+	unsigned int vertical_frontporch_dyn;
+	unsigned int vertical_frontporch_for_low_power_dyn;
+	unsigned int vertical_active_line_dyn;
+
+	unsigned int horizontal_sync_active_dyn;
+	unsigned int horizontal_backporch_dyn;
+	unsigned int horizontal_frontporch_dyn;
+	unsigned int horizontal_active_pixel_dyn;
+
+	unsigned int PLL_CLOCK_dyn;	/* PLL_CLOCK = (int) PLL_CLOCK */
+	unsigned int data_rate_dyn;	/* data_rate = PLL_CLOCK x 2 */
+
+	/*real fps during active*/
+	unsigned int vact_timing_fps_dyn;
+};
 
 struct LCM_DSI_PARAMS {
 	enum LCM_DSI_MODE_CON mode;
@@ -674,6 +733,16 @@ struct LCM_DSI_PARAMS {
 	/*for ARR*/
 	unsigned int dynamic_fps_levels;
 	struct dynamic_fps_info dynamic_fps_table[DYNAMIC_FPS_LEVELS];
+#ifdef CONFIG_MTK_HIGH_FRAME_RATE
+	/****DynFPS start****/
+	unsigned int dfps_enable;
+	unsigned int dfps_default_fps;
+	unsigned int dfps_def_vact_tim_fps;
+	unsigned int dfps_num;
+	/*unsigned int dfps_solution;*/
+	struct dfps_info dfps_params[DFPS_LEVELS];
+	/****DynFPS end****/
+#endif
 };
 
 /* ------------------------------------------------------------------------- */
@@ -885,6 +954,11 @@ struct LCM_UTIL_FUNCS {
 	void (*mipi_dsi_cmds_tx)(void *cmdq, struct dsi_cmd_desc *cmds);
 	unsigned int (*mipi_dsi_cmds_rx)(char *out,
 		struct dsi_cmd_desc *cmds, unsigned int len);
+	/*Dynfps*/
+	void (*dsi_dynfps_send_cmd)(
+		void *cmdq, unsigned int cmd,
+		unsigned char count, unsigned char *para_list,
+		unsigned char force_update);
 };
 enum LCM_DRV_IOCTL_CMD {
 	LCM_DRV_IOCTL_ENABLE_CMD_MODE = 0x100,
@@ -892,6 +966,14 @@ enum LCM_DRV_IOCTL_CMD {
 
 struct LCM_DRIVER {
 	const char *name;
+//prize-add prize-wangyunqing-20181110-start	
+    #if defined(CONFIG_PRIZE_HARDWARE_INFO)
+	struct hardware_info lcm_info;
+    #endif
+//prize-add prize-wangyunqing-20181110-end
+/* prize added by lifenfen, for backlight_level func ,  get Amoled lcd backlight if lcd esd recovery, 20190221 begin */
+	unsigned int (*backlight_level)(void);
+/* prize added by lifenfen, for backlight_level func ,  get Amoled lcd backlight if lcd esd recovery, 20190221 end */
 	void (*set_util_funcs)(const struct LCM_UTIL_FUNCS *util);
 	void (*get_params)(struct LCM_PARAMS *params);
 
@@ -915,7 +997,7 @@ struct LCM_DRIVER {
 	void (*set_backlight_cmdq)(void *handle, unsigned int level);
 	void (*set_pwm)(unsigned int divider);
 	unsigned int (*get_pwm)(unsigned int divider);
-	void (*set_backlight_mode)(unsigned int mode);
+	void (*set_backlight_mode)(void *handle, unsigned int mode);//prize-wyq 20190325 modify for cmdq handle
 	/* ///////////////////////// */
 
 	int (*adjust_fps)(void *cmdq, int fps, struct LCM_PARAMS *params);
@@ -945,6 +1027,15 @@ struct LCM_DRIVER {
 	void (*set_pwm_for_mix)(int enable);
 
 	void (*aod)(int enter);
+
+//prize added by huarui, add tp driver, 20190327-start
+	void (*poweroff_ext)(void);
+//prize added by huarui, add tp driver, 20190327-end
+	/* /////////////DynFPS///////////////////////////// */
+	void (*dfps_send_lcm_cmd)(void *cmdq_handle,
+		unsigned int from_level, unsigned int to_level);
+	bool (*dfps_need_send_cmd)(
+	unsigned int from_level, unsigned int to_level);
 };
 
 /* LCM Driver Functions */
@@ -959,6 +1050,24 @@ extern enum LCM_DSI_MODE_CON lcm_dsi_mode;
 extern int display_bias_enable(void);
 extern int display_bias_disable(void);
 extern int display_bias_regulator_init(void);
+
+
+//prize
+extern int display_bias_vpos_enable(int enable);
+extern int display_bias_vneg_enable(int enable);
+extern int display_bias_vpos_set(int mv);
+extern int display_bias_vneg_set(int mv);
+extern int display_ldo18_enable(int enable);
+extern int display_ldo28_enable(int enable);
+/* begin, prize-lifenfen-20181206, add for lcm gpio pinctl control */
+#define LCM_RESET_PIN_NO         0
+#define LCM_POWER_DP_NO          1             //2.8V
+#define LCM_POWER_DM_NO          2             //1.8V
+#define LCM_POWER_ENP_NO         3
+#define LCM_POWER_ENN_NO         4
+
+int mt_dsi_pinctrl_set(unsigned int pin , unsigned int level);
+/* end, prize-lifenfen-20181206, add for lcm gpio pinctl control */
 
 
 

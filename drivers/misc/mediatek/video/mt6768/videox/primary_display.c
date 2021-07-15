@@ -217,7 +217,12 @@ static int primary_display_get_round_corner_mva(
 /* Must manipulate wake lock through lock_primary_wake_lock() */
 /* hold the wakelock to make kernel awake when primary display is on*/
 struct wakeup_source pri_wk_lock;
-
+//prize-liaoxingen-20200922-start
+#if defined(CONFIG_PRIZE_HARDWARE_INFO)
+#include "../../../hardware_info/hardware_info.h"
+extern struct hardware_info current_lcm_info;
+#endif
+//prize-liaoxingen-20200922-end
 /* Notice: should hold path lock before call this function */
 void lock_primary_wake_lock(bool lock)
 {
@@ -3810,6 +3815,11 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps,
 		goto done;
 	} else {
 		DISPCHECK("disp_lcm_probe SUCCESS\n");
+        //prize-liaoxingen-20200922-start
+#if defined(CONFIG_PRIZE_HARDWARE_INFO)
+        current_lcm_info=pgc->plcm->drv->lcm_info;
+#endif
+        //prize-liaoxingen-20200922-end
 	}
 
 	lcm_param = disp_lcm_get_params(pgc->plcm);
@@ -8708,6 +8718,7 @@ unsigned int primary_display_get_option(const char *option)
 
 int primary_display_lcm_ATA(void)
 {
+#if 0
 	enum DISP_STATUS ret = DISP_STATUS_OK;
 
 	DISPFUNC();
@@ -8744,6 +8755,42 @@ done:
 	primary_display_esd_check_enable(1);
 	_primary_path_switch_dst_unlock();
 	return ret;
+#endif
+	struct ddp_lcm_read_cmd_table read_table;
+	int  recv_data_cnt;
+	char read_buffer[16];
+
+	memset(&read_table, 0,
+		sizeof(struct ddp_lcm_read_cmd_table));
+		read_table.cmd[0] = 0x0A;
+
+	do_lcm_vdo_lp_read(&read_table);
+	DISPINFO("after b0 %x, b1 %x, b2 %x, b3 = %x\n",
+		read_table.data[0].byte0,
+		read_table.data[0].byte1,
+		read_table.data[0].byte2,
+		read_table.data[0].byte3);
+	DISPINFO("after b0 %x, b1 %x, b2 %x, b3 = %x\n",
+		read_table.data1[0].byte0,
+		read_table.data1[0].byte1,
+		read_table.data1[0].byte2,
+		read_table.data1[0].byte3);
+
+	if (read_table.data[0].byte0 == 0x21) {
+		recv_data_cnt = read_table.data[0].byte1
+			+ read_table.data[0].byte2 * 16;
+		if (recv_data_cnt <= 4) {
+			memcpy((void *)read_buffer,
+				(void *)(read_table.data1), recv_data_cnt);
+		}
+
+		if (read_buffer[0] == 0x9C) {
+			DISPINFO("[LCM ATA Check] [0x0A]=0x%02x\n",
+				read_buffer[0]);
+			return true;
+		}
+	}
+	return false;
 }
 
 static int Panel_Master_primary_display_config_dsi(const char *name,
