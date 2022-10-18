@@ -2299,7 +2299,6 @@ static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	clear_bit(IGNORE_BULK_OUT, &fsg->atomic_bitflags);
 
 
-	fsg->common->new_fsg = fsg;
 	__raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE, fsg);
 	return USB_GADGET_DELAYED_STATUS;
 
@@ -2327,7 +2326,6 @@ static void fsg_disable(struct usb_function *f)
 		fsg->bulk_out_enabled = 0;
 	}
 
-	fsg->common->new_fsg = NULL;
 	__raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE, NULL);
 }
 
