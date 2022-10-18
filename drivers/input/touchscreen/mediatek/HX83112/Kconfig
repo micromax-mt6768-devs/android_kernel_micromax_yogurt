@@ -3,13 +3,13 @@
 #
 
 config TOUCHSCREEN_HIMAX_I2C
-        tristate "HIMAX chipset i2c touchscreen"
+        bool "HIMAX chipset i2c touchscreen"
 		depends on TOUCHSCREEN_HIMAX_CHIPSET
 		help
 		This enables support for HIMAX CHIPSET over I2C based touchscreens.
 
 config TOUCHSCREEN_HIMAX_DEBUG
-        tristate "HIMAX debug function"
+        bool "HIMAX debug function"
 		depends on TOUCHSCREEN_HIMAX_I2C
 		help
 		This enables support for HIMAX debug function.
