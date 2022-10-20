@@ -6,6 +6,8 @@ function compile()
 source ~/.bashrc && source ~/.profile
 export LC_ALL=C && export USE_CCACHE=1
 ccache -M 100G
+CROSS_COMPILE+="ccache clang"
+CCACHE=true
 export ARCH=arm64
 export KBUILD_BUILD_HOST=ohing
 export KBUILD_BUILD_USER="sakthivel"
@@ -20,7 +22,7 @@ make O=out ARCH=arm64 E7746_defconfig
 PATH="${PWD}/clang/bin:${PATH}:${PWD}/los-4.9-32/bin:${PATH}:${PWD}/los-4.9-64/bin:${PATH}" \
 make -j$(nproc --all) O=out \
                       ARCH=arm64 \
-                      CC="clang" \
+                      CC='ccache clang -Qunused-arguments -fcolor-diagnostics' \
                       CLANG_TRIPLE=aarch64-linux-gnu- \
                       CROSS_COMPILE="${PWD}/los-4.9-64/bin/aarch64-linux-android-" \
                       CROSS_COMPILE_ARM32="${PWD}/los-4.9-32/bin/arm-linux-androideabi-" \
